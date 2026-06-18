@@ -4,10 +4,10 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, PollAnswerHandler
 from app.config import settings
 from app.handlers.user_handlers import start_handler, stats_handler, top_handler, lessons_menu_handler
-from app.handlers.quiz_handlers import start_quiz_handler, poll_answer_handler
-from app.handlers.admin_handlers import admin_start, add_lesson_conv, add_word_conv
+from app.handlers.quiz_handlers import start_quiz_handler, poll_answer_handler, restart_quiz_handler
 from app.database.session import engine
 from app.database.models import Base
+from app.api.admin_api import router as admin_router
 
 ptb_app = Application.builder().token(settings.BOT_TOKEN).build()
 
@@ -17,16 +17,13 @@ def setup_handlers(app: Application):
     app.add_handler(CommandHandler("top", top_handler))
     
     app.add_handler(CallbackQueryHandler(lessons_menu_handler, pattern="^menu_lessons$"))
+    app.add_handler(CallbackQueryHandler(start_handler, pattern="^menu_main$"))
     app.add_handler(CallbackQueryHandler(stats_handler, pattern="^menu_stats$"))
     app.add_handler(CallbackQueryHandler(top_handler, pattern="^menu_top$"))
     app.add_handler(CallbackQueryHandler(start_quiz_handler, pattern="^start_lesson_"))
+    app.add_handler(CallbackQueryHandler(restart_quiz_handler, pattern="^restart_lesson_"))
     
     app.add_handler(PollAnswerHandler(poll_answer_handler))
-    
-    # Admin
-    app.add_handler(CommandHandler("admin", admin_start))
-    app.add_handler(add_lesson_conv)
-    app.add_handler(add_word_conv)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -42,6 +39,7 @@ async def lifespan(app: FastAPI):
     await ptb_app.shutdown()
 
 app = FastAPI(lifespan=lifespan)
+app.include_router(admin_router)
 
 @app.post("/")
 async def process_update(request: Request):

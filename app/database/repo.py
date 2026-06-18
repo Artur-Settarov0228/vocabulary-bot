@@ -66,6 +66,16 @@ class Repository:
         )
         return result.scalars().all()
 
+    async def delete_user_answers_for_lesson(self, user_id: int, lesson_id: int):
+        await self.session.execute(
+            delete(UserAnswer)
+            .where(UserAnswer.user_id == user_id)
+            .where(UserAnswer.word_id.in_(
+                select(Word.id).filter(Word.lesson_id == lesson_id)
+            ))
+        )
+        await self.session.flush()
+
     async def get_poll_session(self, poll_id: str) -> Optional[PollSession]:
         result = await self.session.execute(select(PollSession).filter(PollSession.poll_id == poll_id))
         return result.scalars().first()

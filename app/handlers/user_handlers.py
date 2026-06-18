@@ -54,11 +54,14 @@ async def stats_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, sess
                 f"Yechildi: {ls.total_questions} | To'g'ri: {ls.correct_answers} | Noto'g'ri: {ls.wrong_answers}"
             )
             
+    keyboard = [[InlineKeyboardButton("🔙 Orqaga", callback_data="menu_main")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+            
     if update.callback_query:
-        await update.callback_query.message.reply_text(text, parse_mode="Markdown")
+        await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
         await update.callback_query.answer()
     else:
-        await update.message.reply_text(text, parse_mode="Markdown")
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
 
 @with_session
 async def top_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, session: AsyncSession):
@@ -75,11 +78,14 @@ async def top_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, sessio
     if not top_users:
         text = "Hozircha reyting mavjud emas."
         
+    keyboard = [[InlineKeyboardButton("🔙 Orqaga", callback_data="menu_main")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+        
     if update.callback_query:
-        await update.callback_query.message.reply_text(text, parse_mode="Markdown")
+        await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
         await update.callback_query.answer()
     else:
-        await update.message.reply_text(text, parse_mode="Markdown")
+        await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
 
 @with_session
 async def lessons_menu_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, session: AsyncSession):

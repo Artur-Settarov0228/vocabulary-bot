@@ -70,9 +70,14 @@ class QuizService:
         if not unanswered_words: return None
 
         target_word = random.choice(unanswered_words)
-        other_words = [w for w in all_words if w.id != target_word.id]
-        
-        wrong_options = [w.uzbek_word for w in other_words]
+        wrong_options = []
+        if getattr(target_word, "variants", None):
+            custom_variants = [v.strip() for v in target_word.variants.split(",") if v.strip()]
+            wrong_options.extend(custom_variants[:3])
+
+        if len(wrong_options) < 3:
+            other_words = [w for w in all_words if w.id != target_word.id]
+            wrong_options.extend([w.uzbek_word for w in other_words if w.uzbek_word not in wrong_options])
         
         if len(wrong_options) < 3:
             from sqlalchemy import select
@@ -82,13 +87,17 @@ class QuizService:
             random.shuffle(all_extra)
             wrong_options.extend(all_extra[:3 - len(wrong_options)])
             
-            fallbacks = ["Mashina", "Kitob", "Qalam", "Daraxt", "Telefon", "Suv", "Quyosh"]
+            fallbacks = [
+                "Mashina 🚗", "Kitob 📚", "Qalam ✏️", "Daraxt 🌳", 
+                "Telefon 📱", "Suv 💧", "Quyosh ☀️", "Oila 👨‍👩‍👦", "Uy 🏠"
+            ]
             for f in fallbacks:
                 if len(wrong_options) >= 3: break
                 if f not in wrong_options and f != target_word.uzbek_word:
                     wrong_options.append(f)
         else:
-            wrong_options = random.sample(wrong_options, 3)
+            if len(wrong_options) > 3:
+                wrong_options = random.sample(wrong_options, 3)
             
         options = [target_word.uzbek_word] + wrong_options
         random.shuffle(options)

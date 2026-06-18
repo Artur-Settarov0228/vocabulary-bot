@@ -1,8 +1,18 @@
-from telegram import Update, Poll, InputMediaPhoto
+from telegram import Update, Poll, InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.utils import with_session
 from app.services.core import QuizService, UserService
+from telegram.error import BadRequest
+
+async def safe_send_poll(context, **poll_kwargs):
+    try:
+        return await context.bot.send_poll(**poll_kwargs)
+    except BadRequest as e:
+        if "api_kwargs" in poll_kwargs:
+            del poll_kwargs["api_kwargs"]
+            return await context.bot.send_poll(**poll_kwargs)
+        raise e
 
 @with_session
 async def start_quiz_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, session: AsyncSession):
@@ -17,7 +27,27 @@ async def start_quiz_handler(update: Update, context: ContextTypes.DEFAULT_TYPE,
     next_q = await quiz_service.get_next_question(db_user.id, lesson_id)
     
     if not next_q:
-        await query.message.reply_text("Tabriklaymiz! 🎉 Siz bu darsdagi barcha savollarni yakunladingiz.\n(Yoki bu darsga hali so'zlar qo'shilmagan)")
+        keyboard = [
+            [
+                InlineKeyboardButton("🔄 Qayta yechish", callback_data=f"restart_lesson_{lesson_id}"),
+                InlineKeyboardButton("🔙 Orqaga", callback_data="menu_lessons")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        stats = await quiz_service.stats_service.repo.get_user_lesson_stats(db_user.id, lesson_id)
+        
+        text = "Tabriklaymiz! 🎉 Siz bu darsdagi barcha savollarni yakunladingiz.\n"
+        if stats:
+            text += (
+                f"\n📊 **Dars natijangiz**:\n"
+                f"Jami yechilgan: {stats.total_questions} ta\n"
+                f"✅ To'g'ri: {stats.correct_answers} ta\n"
+                f"❌ Noto'g'ri: {stats.wrong_answers} ta\n"
+            )
+        else:
+            text += "\n(Bu darsga hali so'zlar qo'shilmagan)"
+            
+        await query.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
         return
         
     target_word, options, correct_index = next_q
@@ -37,14 +67,9 @@ async def start_quiz_handler(update: Update, context: ContextTypes.DEFAULT_TYPE,
     }
     
     if target_word.image_url:
-        poll_kwargs["api_kwargs"] = {"media": InputMediaPhoto(media=target_word.image_url).to_dict()}
-        # Note: Depending on ptb version, sometimes .to_dict() is needed or just passing the object works.
-        # But looking at user code they passed the object. Let's pass the dictionary to be 100% safe since api_kwargs takes a dict.
-        # Wait, the user specifically commented: "Bot kutubxonasi xato bermasligi uchun json string emas, InputMediaPhoto obyekti uzatamiz".
-        # So I will pass the object.
         poll_kwargs["api_kwargs"] = {"media": InputMediaPhoto(media=target_word.image_url)}
         
-    poll_message = await context.bot.send_poll(**poll_kwargs)
+    poll_message = await safe_send_poll(context, **poll_kwargs)
     
     # Save poll session
     await quiz_service.save_poll_session(
@@ -80,12 +105,33 @@ async def poll_answer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     if word.description:
         text += f"\nQo'shimcha ma'lumot: {word.description}"
         
-    await context.bot.send_message(chat_id=user_id, text=text)
+    keyboard = [[InlineKeyboardButton("🔙 Darslarga qaytish", callback_data="menu_lessons")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+        
+    await context.bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup)
     
     # Automatically send next question
     next_q = await quiz_service.get_next_question(db_user.id, lesson_id)
     if not next_q:
-        await context.bot.send_message(chat_id=user_id, text="Tabriklaymiz! 🎉 Siz bu darsdagi barcha savollarni yakunladingiz.\n(Yoki bu darsga hali so'zlar qo'shilmagan)")
+        keyboard = [
+            [
+                InlineKeyboardButton("🔄 Qayta yechish", callback_data=f"restart_lesson_{lesson_id}"),
+                InlineKeyboardButton("🔙 Orqaga", callback_data="menu_lessons")
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        stats = await quiz_service.stats_service.repo.get_user_lesson_stats(db_user.id, lesson_id)
+        
+        text = "Tabriklaymiz! 🎉 Siz bu darsdagi barcha savollarni yakunladingiz.\n"
+        if stats:
+            text += (
+                f"\n📊 **Dars natijangiz**:\n"
+                f"Jami yechilgan: {stats.total_questions} ta\n"
+                f"✅ To'g'ri: {stats.correct_answers} ta\n"
+                f"❌ Noto'g'ri: {stats.wrong_answers} ta\n"
+            )
+            
+        await context.bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup, parse_mode="Markdown")
         return
         
     target_word, options, correct_index = next_q
@@ -105,7 +151,50 @@ async def poll_answer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     if target_word.image_url:
         poll_kwargs["api_kwargs"] = {"media": InputMediaPhoto(media=target_word.image_url)}
         
-    poll_message = await context.bot.send_poll(**poll_kwargs)
+    poll_message = await safe_send_poll(context, **poll_kwargs)
+    
+    await quiz_service.save_poll_session(
+        poll_id=poll_message.poll.id,
+        user_id=db_user.id,
+        word_id=target_word.id,
+        correct_index=correct_index
+    )
+
+@with_session
+async def restart_quiz_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, session: AsyncSession):
+    query = update.callback_query
+    await query.answer()
+    
+    lesson_id = int(query.data.split("_")[-1])
+    user = update.effective_user
+    db_user = await UserService(session).get_or_create_user(user.id, user.full_name, user.username)
+    
+    quiz_service = QuizService(session)
+    await quiz_service.repo.delete_user_answers_for_lesson(db_user.id, lesson_id)
+    
+    next_q = await quiz_service.get_next_question(db_user.id, lesson_id)
+    if not next_q:
+        await query.message.reply_text("Bu darsda so'zlar topilmadi.")
+        return
+        
+    target_word, options, correct_index = next_q
+    
+    poll_kwargs = {
+        "chat_id": user.id,
+        "question": f"Bu nima? ({target_word.english_word})",
+        "options": options,
+        "type": Poll.QUIZ,
+        "correct_option_id": correct_index,
+        "is_anonymous": False,
+        "read_timeout": 60,
+        "write_timeout": 60,
+        "connect_timeout": 60
+    }
+    
+    if target_word.image_url:
+        poll_kwargs["api_kwargs"] = {"media": InputMediaPhoto(media=target_word.image_url)}
+        
+    poll_message = await safe_send_poll(context, **poll_kwargs)
     
     await quiz_service.save_poll_session(
         poll_id=poll_message.poll.id,
