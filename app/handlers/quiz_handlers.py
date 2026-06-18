@@ -1,18 +1,22 @@
 from telegram import Update, Poll, InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.utils import with_session
 from app.services.core import QuizService, UserService
-from telegram.error import BadRequest
+from telegram.error import BadRequest, RetryAfter
+import asyncio
 
 async def safe_send_poll(context, **poll_kwargs):
-    try:
-        return await context.bot.send_poll(**poll_kwargs)
-    except BadRequest as e:
-        if "api_kwargs" in poll_kwargs:
-            del poll_kwargs["api_kwargs"]
+    while True:
+        try:
             return await context.bot.send_poll(**poll_kwargs)
-        raise e
+        except RetryAfter as e:
+            # Telegram kutishni so'rasa, o'sha vaqtcha kutib keyin qayta urinamiz
+            await asyncio.sleep(e.retry_after + 1)
+        except BadRequest as e:
+            if "api_kwargs" in poll_kwargs:
+                del poll_kwargs["api_kwargs"]
+                # rasmsiz jo'natib ko'ramiz, loop davom etadi (yoki ishlaydi, yoki yana RetryAfter)
+                continue
+            raise e
 
 @with_session
 async def start_quiz_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, session: AsyncSession):
