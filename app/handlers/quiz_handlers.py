@@ -1,5 +1,7 @@
 from telegram import Update, Poll, InputMediaPhoto, InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import ContextTypes
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.utils import with_session
 from app.services.core import QuizService, UserService
 from telegram.error import BadRequest, RetryAfter
 import asyncio
