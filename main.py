@@ -33,8 +33,10 @@ async def lifespan(app: FastAPI):
     setup_handlers(ptb_app)
     await ptb_app.initialize()
     await ptb_app.start()
-    await ptb_app.bot.set_webhook(url=settings.WEBHOOK_URL)
+    await ptb_app.bot.delete_webhook(drop_pending_updates=True)
+    await ptb_app.updater.start_polling()
     yield
+    await ptb_app.updater.stop()
     await ptb_app.stop()
     await ptb_app.shutdown()
 
