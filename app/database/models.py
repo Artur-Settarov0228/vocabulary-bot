@@ -58,6 +58,7 @@ class Word(Base):
     lesson_id: Mapped[int] = mapped_column(ForeignKey("lessons.id", ondelete="CASCADE"), index=True)
     english_word: Mapped[str] = mapped_column(String(255), index=True)
     uzbek_word: Mapped[str] = mapped_column(String(255), index=True)
+    question_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     image_url: Mapped[str] = mapped_column(Text)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     variants: Mapped[str | None] = mapped_column(Text, nullable=True)

@@ -99,7 +99,15 @@ class QuizService:
             if len(wrong_options) > 3:
                 wrong_options = random.sample(wrong_options, 3)
             
-        options = [target_word.uzbek_word] + wrong_options
+        options = [target_word.uzbek_word]
+        for w in wrong_options:
+            if w not in options and len(options) < 4:
+                options.append(w)
+                
+        # Agar qandaydir sabab bilan variantlar 2 tadan kam bo'lsa (Telegram kamida 2 ta so'raydi)
+        if len(options) < 2:
+            options.append("Boshqa javob")
+            
         random.shuffle(options)
         correct_index = options.index(target_word.uzbek_word)
         return target_word, options, correct_index

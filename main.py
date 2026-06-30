@@ -50,7 +50,7 @@ async def process_update(request: Request):
         return Response(status_code=status.HTTP_200_OK)
     except Exception as e:
         print(f"Error processing update: {e}")
-        return Response(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return Response(status_code=status.HTTP_200_OK)
 
 @app.get("/health")
 async def health_check():

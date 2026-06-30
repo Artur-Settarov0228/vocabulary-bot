@@ -4,6 +4,7 @@ from app.config import settings
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=False,
+    connect_args={"timeout": 60.0}
 )
 
 async_session = async_sessionmaker(

@@ -1,6 +1,6 @@
 from typing import Sequence, Optional, Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, delete
 from app.database.models import User, Lesson, Word, UserAnswer, UserStats, UserLessonStats, PollSession
 
 class Repository:
@@ -42,6 +42,10 @@ class Repository:
         await self.session.flush()
         return lesson
 
+    async def delete_lesson(self, lesson_id: int):
+        await self.session.execute(delete(Lesson).filter(Lesson.id == lesson_id))
+        await self.session.flush()
+
     # Words
     async def get_words_by_lesson(self, lesson_id: int) -> Sequence[Word]:
         result = await self.session.execute(select(Word).filter(Word.lesson_id == lesson_id))
@@ -56,6 +60,10 @@ class Repository:
         self.session.add(word)
         await self.session.flush()
         return word
+
+    async def delete_word(self, word_id: int):
+        await self.session.execute(delete(Word).filter(Word.id == word_id))
+        await self.session.flush()
 
     # Answers & Polls
     async def get_answered_word_ids(self, user_id: int, lesson_id: int) -> Sequence[int]:

@@ -16,14 +16,24 @@ async def safe_send_poll(context, **poll_kwargs):
         except BadRequest as e:
             if "api_kwargs" in poll_kwargs:
                 del poll_kwargs["api_kwargs"]
-                # rasmsiz jo'natib ko'ramiz, loop davom etadi (yoki ishlaydi, yoki yana RetryAfter)
+                # rasmsiz jo'natib ko'ramiz, loop davom etadi
                 continue
             raise e
+
+async def safe_send_message(context, **kwargs):
+    while True:
+        try:
+            return await context.bot.send_message(**kwargs)
+        except RetryAfter as e:
+            await asyncio.sleep(e.retry_after + 1)
 
 @with_session
 async def start_quiz_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, session: AsyncSession):
     query = update.callback_query
-    await query.answer()
+    try:
+        await query.answer()
+    except BadRequest:
+        pass
     
     lesson_id = int(query.data.split("_")[-1])
     user = update.effective_user
@@ -58,7 +68,7 @@ async def start_quiz_handler(update: Update, context: ContextTypes.DEFAULT_TYPE,
         
     target_word, options, correct_index = next_q
     
-    question_text = f"Bu nima? ({target_word.english_word})"
+    question_text = target_word.question_text if getattr(target_word, "question_text", None) else f"Bu nima? ({target_word.english_word})"
     
     poll_kwargs = {
         "chat_id": user.id,
@@ -114,7 +124,7 @@ async def poll_answer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
     keyboard = [[InlineKeyboardButton("🔙 Darslarga qaytish", callback_data="menu_lessons")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
         
-    await context.bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup)
+    await safe_send_message(context, chat_id=user_id, text=text, reply_markup=reply_markup)
     
     # Automatically send next question
     next_q = await quiz_service.get_next_question(db_user.id, lesson_id)
@@ -137,14 +147,14 @@ async def poll_answer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
                 f"❌ Noto'g'ri: {stats.wrong_answers} ta\n"
             )
             
-        await context.bot.send_message(chat_id=user_id, text=text, reply_markup=reply_markup, parse_mode="Markdown")
+        await safe_send_message(context, chat_id=user_id, text=text, reply_markup=reply_markup, parse_mode="Markdown")
         return
         
     target_word, options, correct_index = next_q
     
     poll_kwargs = {
         "chat_id": user_id,
-        "question": f"Bu nima? ({target_word.english_word})",
+        "question": target_word.question_text if getattr(target_word, "question_text", None) else f"Bu nima? ({target_word.english_word})",
         "options": options,
         "type": Poll.QUIZ,
         "correct_option_id": correct_index,
@@ -169,7 +179,10 @@ async def poll_answer_handler(update: Update, context: ContextTypes.DEFAULT_TYPE
 @with_session
 async def restart_quiz_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, session: AsyncSession):
     query = update.callback_query
-    await query.answer()
+    try:
+        await query.answer()
+    except BadRequest:
+        pass
     
     lesson_id = int(query.data.split("_")[-1])
     user = update.effective_user
@@ -187,7 +200,7 @@ async def restart_quiz_handler(update: Update, context: ContextTypes.DEFAULT_TYP
     
     poll_kwargs = {
         "chat_id": user.id,
-        "question": f"Bu nima? ({target_word.english_word})",
+        "question": target_word.question_text if getattr(target_word, "question_text", None) else f"Bu nima? ({target_word.english_word})",
         "options": options,
         "type": Poll.QUIZ,
         "correct_option_id": correct_index,

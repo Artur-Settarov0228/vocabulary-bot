@@ -1,9 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
 from app.database.session import async_session
-from app.database.models import Lesson, Word
 from app.schemas import LessonCreate, LessonResponse, WordCreate, WordResponse
 from app.database.repo import Repository
 
@@ -37,3 +36,15 @@ async def create_word(word_in: WordCreate, db: AsyncSession = Depends(get_db)):
     repo = Repository(db)
     word = await repo.create_word(word_in.model_dump())
     return word
+
+@router.delete("/lessons/{lesson_id}")
+async def delete_lesson(lesson_id: int, db: AsyncSession = Depends(get_db)):
+    repo = Repository(db)
+    await repo.delete_lesson(lesson_id)
+    return {"status": "success", "message": f"Lesson {lesson_id} deleted"}
+
+@router.delete("/words/{word_id}")
+async def delete_word(word_id: int, db: AsyncSession = Depends(get_db)):
+    repo = Repository(db)
+    await repo.delete_word(word_id)
+    return {"status": "success", "message": f"Word {word_id} deleted"}

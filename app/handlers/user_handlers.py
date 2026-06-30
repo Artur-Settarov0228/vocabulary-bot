@@ -59,7 +59,10 @@ async def stats_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, sess
             
     if update.callback_query:
         await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
-        await update.callback_query.answer()
+        try:
+            await update.callback_query.answer()
+        except Exception:
+            pass
     else:
         await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
 
@@ -83,7 +86,10 @@ async def top_handler(update: Update, context: ContextTypes.DEFAULT_TYPE, sessio
         
     if update.callback_query:
         await update.callback_query.edit_message_text(text, reply_markup=reply_markup, parse_mode="Markdown")
-        await update.callback_query.answer()
+        try:
+            await update.callback_query.answer()
+        except Exception:
+            pass
     else:
         await update.message.reply_text(text, reply_markup=reply_markup, parse_mode="Markdown")
 

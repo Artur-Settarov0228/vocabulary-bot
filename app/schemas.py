@@ -17,6 +17,7 @@ class WordCreate(BaseModel):
     lesson_id: int
     english_word: str
     uzbek_word: str
+    question_text: Optional[str] = None
     image_url: Optional[str] = None
     description: Optional[str] = None
     variants: Optional[str] = None
